@@ -1,56 +1,46 @@
-#TOKEN = getenv("6201217395:AAEGTPOsK_tq15RQPmMsNDvGdJdJaobvcIE")
 import asyncio
 import logging
+import sqlite3
 import sys
-from os import getenv
-from config import token
 
-from aiogram import Bot, Dispatcher, Router, types
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram import Bot, Dispatcher
 from aiogram.types import Message
-from aiogram.utils.markdown import hbold
 
-# Bot token can be obtained via https://t.me/BotFather
-#TOKEN = getenv("BOT_TOKEN")
-TOKEN = token
+from config import TOKEN
 
-# All handlers should be attached to the Router (or Dispatcher)
-dp = Dispatcher()
+command_list = ['/start', '/help', '/base']
+bot = Bot(token = TOKEN)
+dp = Dispatcher(bot)
 
 
-@dp.message(CommandStart())
+@dp.message_handler(commands=['start'])
 async def command_start_handler(message: Message) -> None:
-    """
-    This handler receives messages with `/start` command
-    """
-    # Most event objects have aliases for API methods that can be called in events' context
-    # For example if you want to answer to incoming message you can use `message.answer(...)` alias
-    # and the target chat will be passed to :ref:`aiogram.methods.send_message.SendMessage`
-    # method automatically or call API method directly via
-    # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
-    await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
+    await message.answer(f'Hello, {message.from_user.first_name}! Nice to see you!')
 
+@dp.message_handler(commands=['help'])
+async def command_help_handler(message: Message) -> None:
+    await message.answer(f'available commands {", ".join(command_list)}')
 
-@dp.message()
-async def echo_handler(message: types.Message) -> None:
-    """
-    Handler will forward receive a message back to the sender
+@dp.message_handler(commands=['base'])
+async def command_base_handler(message: Message) -> None:
+    conn = sqlite3.connect('my_sql.sql')
+    cur = conn.cursor()
 
-    By default, message handler will handle all message types (like a text, photo, sticker etc.)
-    """
-    try:
-        # Send a copy of the received message
-        await message.send_copy(chat_id=message.chat.id)
-    except TypeError:
-        # But not all the types is supported to be copied so need to handle it
-        await message.answer("Nice try!")
+    cur.execute('''CREATE TABLE IF NOT EXISTS users (
+        id int auto_increment primary key,
+        name vaechar(50), pass varchar(50)
+        )''')
+    conn.commit()
+    cur.close()
+    conn.close()
 
+    await bot.send_message(message.from_user.id, f'Пользователь {message.from_user.first_name} внесен в базу данных')
 
-async def main() -> None:
-    # Initialize Bot instance with a default parse mode which will be passed to all API calls
-    bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
-    # And the run events dispatching
+@dp.message_handler()
+async def echo_message(message: Message) -> None:
+    await bot.send_message(chat_id=message.from_user.id, text=f'{message.from_user.first_name}, {message.text*2}')
+
+async def main() ->None:
     await dp.start_polling(bot)
 
 
